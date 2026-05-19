@@ -27,6 +27,7 @@ def posicion_pacman(mapa):
 class Personajes:   
     def __init__(self,mapa):
         self.mapa = mapa 
+
 class Pacman(Personajes):
     def __init__(self,x,y):
         Personajes.__init__(self,mapa)
@@ -97,6 +98,9 @@ class Pacman(Personajes):
         pixel_x = self.x * tamaño_pixel + tamaño_pixel // 2
         pixel_y = self.y * tamaño_pixel + tamaño_pixel // 2 + tamaño_score - 10
         pygame.draw.circle(pantalla,(255, 217, 0), (pixel_x, pixel_y), 10)
+class fantasmas(Personajes):
+    def __init__(self):
+        Personajes.__init__(self,mapa)
 
 class Puntaje:
     def __init__(self, score):
@@ -148,9 +152,10 @@ def crear_mapa(mapa,pantalla):
                     
         pacman.dibujar()
         movimiento += 1
+        score = pacman.comer()
         if movimiento % 8 == 0:
             pacman.mover()
-        score = pacman.comer()
+     
         if score == None:
             score = 0
             puntos_actuales = puntaje.actualizar(score)
