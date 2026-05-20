@@ -9,32 +9,15 @@ paleta_colores = {
     "P" : (196, 181, 183),
     "T" : (18, 202, 247)
 }
-mapa = []
-with open("mapa.txt" , "r") as f:  # abrimos el archivo de texto con el mapa
-    for linea in f:
-        mapa.append(list(linea.strip())) # guardamos cada linea de texto(fila) en una lista 
+
         
 largo_fila = 28
 alto_mapa = 31      #seteamos los parametros del mapa y agregados y el tamaño de los pixeles
 tamaño_pixel = 20
 tamaño_score = 60
 
-pantalla = pygame.display.set_mode((largo_fila * tamaño_pixel, (alto_mapa * tamaño_pixel) + tamaño_score))  # creamse la pantalla del juego
 
-def posicion_pacman(mapa: list) -> tuple:
-    """
-    Funcion que busca la posicion de pacman en el mapa
-    
-    Args:
-        mapa (list): mapa del juego
-    
-    Returns:
-        tuple: posicion de pacman en el mapa
-    """
-    for fila in range(alto_mapa):
-        for columna in range(largo_fila):      #buscamos la posicion de pacman en el mapa
-            if mapa[fila][columna] == "P":
-                return columna, fila
+
 class Personajes:   
     """
     clase para los personajes del juego
@@ -42,9 +25,9 @@ class Personajes:
     Args:
         mapa (list): mapa del juego
     """
-    def __init__(self,mapa):
+    def __init__(self,mapa,pantalla):
         self.mapa = mapa  
-
+        self.pantalla = pantalla
 class Pacman(Personajes): 
     """
     clase para el pacman 
@@ -52,13 +35,13 @@ class Pacman(Personajes):
     Args:
         Personajes (class): clase para los personajes del juego
     """
-    def __init__(self,x: int,y: int):
+    def __init__(self,x: int,y: int , mapa, pantalla):
         """   
         Args:
             x (int): posicion x del pacman en tiles
             y (int): posicion y del pacman en tiles
         """
-        Personajes.__init__(self,mapa)
+        Personajes.__init__(self, mapa , pantalla)
         self.x = x * tamaño_pixel   # seteamos la posicion de pacman en pixeles cuando x e y los teniamos en tiles del mapa
         self.y = y * tamaño_pixel    
         self.power_pellet = False  #seteamos el valor de power_pellet 
@@ -180,20 +163,22 @@ class Pacman(Personajes):
         """
         Funcion para dibujar el pacman en la pantalla
         """
-        pygame.draw.circle(pantalla,(255, 217, 0), (self.x +10, self.y + tamaño_score - 10 + 10 ), 10) # dibujamos el pacman en la pantalla teniendo en cuenta el espacio del score y el + 10 para que quede en el medio del tile
+        pygame.draw.circle(self.pantalla,(255, 217, 0), (self.x +10, self.y + tamaño_score - 10 + 10 ), 10) # dibujamos el pacman en la pantalla teniendo en cuenta el espacio del score y el + 10 para que quede en el medio del tile
 
 class fantasmas(Personajes):
     def __init__(self):
-        Personajes.__init__(self,mapa)
+        Personajes.__init__(self)
 
 class Puntaje:
-    def __init__(self, score: int):
+    def __init__(self, score: int, pantalla):
         """
         Args:
             score (int): puntaje del juego
         """
+        self.pantalla = pantalla
         self.puntos = score #seteamos el puntaje
         self.high_score =  self.cargar_high_score() # cargamos el puntaje maximo
+        self.vidas = 3 # seteamos las vidas
     def cargar_high_score(self) -> int: 
         """
         Funcion para cargar el puntaje maximo
@@ -240,72 +225,106 @@ class Puntaje:
         texto_score = fuente.render(f"{self.puntos}", True, (255, 255, 255)) # guardmaos los puntos
         texto_high_score_texto = fuente.render("HIGH SCORE", True, (255, 255, 255)) # guardamos el mensaje high score
         texto_high_score = fuente.render(f"{self.high_score}", True, (255, 255, 255)) # guradmaos el puntaje maximo
-        pantalla.blit(texto_score, (30,30)) # mostramos los ountois en la pantalla
-        pantalla.blit(texto_high_score_texto, (175,0)) # mostramos el mensaje highscore
-        pantalla.blit(texto_high_score, (175,30)) # mostramos el puntaje maximo
- 
+        self.pantalla.blit(texto_score, (30,30)) # mostramos los ountois en la pantalla
+        self.pantalla.blit(texto_high_score_texto, (175,0)) # mostramos el mensaje highscore
+        self.pantalla.blit(texto_high_score, (175,30)) # mostramos el puntaje maximo
+        if self.vidas == 0: # si no quedan vidas
+            self.pantalla.fill((0,0,0))
+            fuente = pygame.font.SysFont("Courier", 60)  # seteamos la fuente para el txto
+            texto_game_over = fuente.render("GAME OVER", True, (255, 255, 255)) # guardamos el mensaje game over
+            self.pantalla.blit(texto_game_over, (120,275)) # mostramos el mensaje game over
+        elif self.vidas == 1: # si quedan 1 vidas
+            pygame.draw.circle(self.pantalla,(255, 217, 0), (50, 675), 10) # dibujamos las vidas en la pantalla
+        elif self.vidas == 2: # si quedan 2 vidas
+            pygame.draw.circle(self.pantalla,(255, 217, 0), (50, 675), 10) # dibujamos las vidas en la pantalla
+            pygame.draw.circle(self.pantalla,(255, 217, 0), (80, 675), 10)
+        elif self.vidas == 3: # si quedan 3 vidas
+            pygame.draw.circle(self.pantalla,(255, 217, 0), (50, 675), 10)
+            pygame.draw.circle(self.pantalla,(255, 217, 0), (80, 675), 10)   # dibujamos las vidas en la pantalla
+            pygame.draw.circle(self.pantalla,(255, 217, 0), (110, 675), 10)
+
+
+class Juego:
+    def __init__(self):
+        """
+        Funcion para iniciar el juego
+        """
+        pygame.init()  # inicializamos la pantalla del pygame
+        self.pantalla = pygame.display.set_mode((largo_fila * tamaño_pixel, (alto_mapa * tamaño_pixel) + tamaño_score + 30))  # creamse la pantalla del juego
+        self.fps =  pygame.time.Clock() # creamos un objeto que usamos para los fps
+        self.puntaje = Puntaje(0, self.pantalla) # creamos un objeto de la clase Puntaje y lo seteamos para que empeize en 0 
+        self.empezar_mapa() # llamamos a la funcion para empezar el juego
     
-px,py = posicion_pacman(mapa) # obtenemos la posicion de pacman en el mapa
-Personajes(mapa) # creamos un objeto de la clase Personajes con el mapa
-pacman = Pacman(px,py) # creamos un objeto de la clase Pacman con la posicion de pacman en el mapa
+    def empezar_mapa(self):
+        """
+        Funcion para crear el mapa del juego
+        """
+        self.mapa = []
+        self.comida_faltante = 0
 
-def crear_mapa(mapa: list,pantalla: pygame.surface.Surface):
-    """
-    Funcion para crear el mapa del juego e iterar sobre el
-    
-    Args:
-        mapa (list): mapa del juego
-        pantalla (pygame.surface.Surface): pantalla del juego
-    """
-    pygame.init()  # inicializamos la pantalla del pygame
-    fps =  pygame.time.Clock() # creamos un objeto que usamos para los fps
-    puntaje = Puntaje(0) # creamos un objeto de la clase Puntaje y lo seteamos para que empeize en 0
-    running = True # seteamos la variable running de qu8e esta corriendo el juego a true
-    contador_comida = 0 # seteamos el contador de comida en 0
-    
-    while running: # mientras el juego este corriendo
-        for event in pygame.event.get():  # obtenemos los eventos para ver si cierra la pantalla la persona
-            if event.type == pygame.QUIT:  # si la persona cierra la pantalla
-                running = False  # seteamos running a false para que pare el juego
-        pantalla.fill((0,0,0))  # seteamos la pantalla a negro
-        for fila in range(alto_mapa):  
-            for columna in range(largo_fila):   # recorremos el mapa
-                color = paleta_colores[mapa[fila][columna]]  # obtenemos el color de la paleta de colores de cada fila,columna
-                lugar = (columna * tamaño_pixel, fila * tamaño_pixel + tamaño_score -10, tamaño_pixel, tamaño_pixel)  # creamos el rectangulo.rect de cada tile
-                centro_x = columna * tamaño_pixel + tamaño_pixel // 2 
-                centro_y = fila * tamaño_pixel + tamaño_pixel // 2 + tamaño_score -10  # obtenemos el centro de cada tile en y tenemos en cuento el tamaño del score
-                centro_pixel = (centro_x, centro_y)    #guardamops el centro de cada tile   
-                if mapa[fila][columna] == ".": # si el tile es comida chica
-                    pygame.draw.rect(pantalla,(196, 181, 183),lugar) # dibujamos el tile en gris
-                    pygame.draw.circle(pantalla,color,centro_pixel, 2)  # dibujamos la comida arriba de ese tile en el centro
-                    contador_comida += 1 # sumamos 1 al contador de comida chica
-                elif mapa[fila][columna] == "o": # si el tile es comida grande
-                    pygame.draw.rect(pantalla,(196, 181, 183),lugar) # dibujamos el tile en gris
-                    pygame.draw.circle(pantalla,color,centro_pixel, 4)  # dibujamos la comida arriba de ese tile en el centro
-                    contador_comida += 1 # sumamos 1 al contador de comida grande
-                else:
-                    pygame.draw.rect(pantalla,color,lugar) # para cualquier otro elemento en base a su palaeta de colores y posciion lo dibujamos en panatlla
-                    
-        pacman.dibujar() # dibujamos pacman
-        score = pacman.comer() # obtenemos el puntaje de la comida si el pacman come
-        if pacman.ver_power_pellet() == True: # verificamos si el power_pellet esta activo
-            velocidad = 2 # si esta activo seteamos la velocidad de pacman a 2
-        else:
-            velocidad = 1 # si no esta activo seteamos la velocidad de pacman a 1
-        pacman.mover(velocidad) # movemos pacman 
-     
-        if score == None: # si score es None
-            score = 0 # seteamos score a 0
-            puntaje.actualizar_puntaje(score) # actualizamos el puntaje
-        else:
-            puntaje.actualizar_puntaje(score) # actualizamos el puntaje
-            contador_comida -= 1 # restamos 1 al contador de comida
+        with open("mapa.txt" , "r") as f:  # abrimos el archivo de texto con el mapa
+            for linea in f:
+                self.mapa.append(list(linea.strip())) # guardamos cada linea de texto(fila) en una lista 
+        poscion_x_pacman = 0
+        poscion_y_pacman = 0
+        for fila in range(alto_mapa):
+            for columna in range(largo_fila):      #buscamos la posicion de pacman en el mapa
+                if self.mapa[fila][columna] == "P":
+                    poscion_x_pacman = columna
+                    poscion_y_pacman = fila             # obtenemos la posicion de pacman en el mapa
+                elif self.mapa[fila][columna] == "." or self.mapa[fila][columna] == "o":
+                    self.comida_faltante += 1  # contamos la cantidad de comida en el mapa
+        self.personajes = Personajes(self.mapa, self.pantalla)  # creamos un objeto de la clase Personajes para el mapa
+        self.pacman = Pacman(poscion_x_pacman,poscion_y_pacman,self.mapa, self.pantalla) # creamos un objeto de la clase Pacman con la posicion de pacman en el mapa y el mapa y la pantalla
 
-        puntaje.mostrar() # mostramos el puntaje y el puntaje maximo
-        pygame.display.flip() # actualizamos la pantalla
-        fps.tick(60)  # seteamos los fps a 60
-    puntaje.actualizar_high_score() # guardamos el puntaje maximo cada que termina la partida
-    pygame.quit() # cerramos la pantalla
+    def correr_juego(self):
+        """
+        Funcion para correr el juego
+        """
+        running = True # seteamos la variable running de qu8e esta corriendo el juego a true
+        while running: # mientras el juego este corriendo
+            for event in pygame.event.get():  # obtenemos los eventos para ver si cierra la pantalla la persona
+                if event.type == pygame.QUIT:  # si la persona cierra la pantalla
+                    running = False  # seteamos running a false para que pare el juego
+            self.pantalla.fill((0,0,0))  # seteamos la pantalla a negro
+            for fila in range(alto_mapa):  
+                for columna in range(largo_fila):   # recorremos el mapa
+                    color = paleta_colores[self.mapa[fila][columna]]  # obtenemos el color de la paleta de colores de cada fila,columna
+                    lugar = (columna * tamaño_pixel, fila * tamaño_pixel + tamaño_score -10, tamaño_pixel, tamaño_pixel)  # creamos el rectangulo.rect de cada tile
+                    centro_x = columna * tamaño_pixel + tamaño_pixel // 2 
+                    centro_y = fila * tamaño_pixel + tamaño_pixel // 2 + tamaño_score -10  # obtenemos el centro de cada tile en y tenemos en cuento el tamaño del score
+                    centro_pixel = (centro_x, centro_y)    #guardamops el centro de cada tile   
+                    if self.mapa[fila][columna] == ".": # si el tile es comida chica
+                        pygame.draw.rect(self.pantalla,(196, 181, 183),lugar) # dibujamos el tile en gris
+                        pygame.draw.circle(self.pantalla,color,centro_pixel, 2)  # dibujamos la comida arriba de ese tile en el centro
+                    elif self.mapa[fila][columna] == "o": # si el tile es comida grande
+                        pygame.draw.rect(self.pantalla,(196, 181, 183),lugar) # dibujamos el tile en gris
+                        pygame.draw.circle(self.pantalla,color,centro_pixel, 4)  # dibujamos la comida arriba de ese tile en el centro
+                    else:
+                        pygame.draw.rect(self.pantalla,color,lugar) # para cualquier otro elemento en base a su palaeta de colores y posciion lo dibujamos en panatlla
+            self.pacman.dibujar() # dibujamos pacman
+            score = self.pacman.comer() # obtenemos el puntaje de la comida si el pacman come
+            if self.pacman.ver_power_pellet() == True: # verificamos si el power_pellet esta activo
+                velocidad = 2 # si esta activo seteamos la velocidad de pacman a 2
+            else:
+                velocidad = 1 # si no esta activo seteamos la velocidad de pacman a 1
+            self.pacman.mover(velocidad) # movemos pacman 
+        
+            if score == None: # si score es None
+                score = 0 # seteamos score a 0
+                self.puntaje.actualizar_puntaje(score) # actualizamos el puntaje
+            else:
+                self.puntaje.actualizar_puntaje(score) # actualizamos el puntaje
+                self.comida_faltante -= 1 # restamos 1 al contador de comida
+                if self.comida_faltante == 0: # si no quedan mas comida
+                    self.empezar_mapa() # llamamos a la funcion para empezar denuevo
 
-crear_mapa(mapa, pantalla) # creamos el mapa
+            self.puntaje.mostrar() # mostramos el puntaje y el puntaje maximo
+            pygame.display.flip() # actualizamos la pantalla
+            self.fps.tick(60)  # seteamos los fps a 60
+        self.puntaje.actualizar_high_score() # guardamos el puntaje maximo cada que termina la partida
+        pygame.quit() # cerramos la pantalla
 
+                
+juego = Juego() # creamos un objeto de la clase Juego
+juego.correr_juego()
