@@ -322,6 +322,11 @@ class juego:
         self.running = True
         self.timer = 0
         self.fase_actual = 0
+        self.clock = pygame.time.Clock()
+        self.estado = 'inicio'
+        self.mostrar_enter = True
+        self.timer_enter = 0
+        self.screen = pygame.display.set_mode((len(self.mapa.mapa) * 24, (len(self.mapa.mapa[0]) * 24) + 50 + 30))
         self.fases = [('scatter', 7),
                         ('chase', 20),
                         ('scatter', 7),
@@ -330,6 +335,22 @@ class juego:
                         ('chase', 20),
                         ('scatter', 5),
                         ('chase', 10000000000)]
+        self.lista_fantasmas = [
+                {"nombre": "Blinky" ,"numero": "1", "color": (255, 0, 0), "desc": "Rojo - El perseguidor."},
+                {"nombre": "Pinky", "numero": "2",  "color": (255, 182, 193), "desc": "Rosa - El emboscador."},
+                {"nombre": "Inky", "numero": "3", "color": (0, 255, 255), "desc": "Celeste - El flanqueador."},
+                {"nombre": "Clyde", "numero": "4", "color": (255, 165, 0), "desc": "Naranja - El tímido."},
+                {"nombre": "Spike", "numero": "5","color": (0, 255, 0), "desc": "Verde - El interceptor."},
+                {"nombre": "Coward", "numero": "6", "color": (128, 0, 128), "desc": "Violeta - El cobarde."}
+            ]
+        self.fantasmas_seleccionados = []
+        self.esquinas_fantasma = []
+        self.posicion_fantasma_seleccionado = 0
+    def manejar_llaves(self, evento):
+        if evento.type == pygame.KEYDOWN:
+            if self.estado=='inicio':
+                if evento.key == pygame.K_RETURN:
+                    self.estado = 'juego'
     def colosiones(self):
         for fantasma in self.fantasmas:
             if self.pacman.colision(fantasma):
@@ -343,6 +364,28 @@ class juego:
                         self.running = False
                     else:
                         self.posiciones_iniciales()
+    def pantalla_inicio(self, dt):
+        self.screen.fill((0,0,0))
+
+        self.screen.fill((0,0,0))
+        fuente_pacman = pygame.font.SysFont("Courier", 60)  # seteamos la fuente para el txto
+        fuente_high_score = pygame.font.SysFont("Courier", 30)
+        texto_Pacman = fuente_pacman.render("PACMAN", True, (255, 255, 0))
+        high_score = self.cargar_high_score()
+        texto_high_score = fuente_high_score.render(f"HIGH SCORE", True, (255, 255, 255))
+        texto_high_score_numero = fuente_high_score.render(f"{high_score}", True, (255, 255, 0))
+        texto_enter = fuente_high_score.render("Presione enter para jugar", True, (255, 255,255))
+        self.screen.blit(texto_Pacman, (160,200))
+        self.screen.blit(texto_high_score, (175,30))
+        self.screen.blit(texto_high_score_numero, (240,80))
+
+        self.timer_enter+=dt
+        if self.timer_enter>= 0.5:
+            self.mostrar_enter = not self.mostrar_enter
+            self.timer_enter = 0
+        if self.mostrar_enter:
+            self.screen.blit(texto_enter, (65, 425))
+
     def posiciones_iniciales(self):
         self.pacman.fil = self.px
         self.pacman.col = self.py
@@ -363,19 +406,19 @@ class juego:
         for fantasma in self.fantasmas:
             fantasma.mover(self.pacman.fil, self.pacman.col,self.pacman.prox_direc, dt)
         self.colosiones()
-    def dibujar(self, screen):
+    def dibujar(self):
         if self.pacman.vidas == 0: # si no quedan vidas
-            screen.fill((0,0,0))
+            self.screen.fill((0,0,0))
             fuente = pygame.font.SysFont("Courier", 60)  # seteamos la fuente para el txto
             texto_game_over = fuente.render("GAME OVER", True, (255, 255, 255)) # guardamos el mensaje game over
-            screen.blit(texto_game_over, (120,275)) # mostramos el mensaje game over
+            self.screen.blit(texto_game_over, (120,275)) # mostramos el mensaje game over
             return
-        self.mapa.renderizar(screen)
-        self.mapa.imprimir_score(self.pacman.score, screen)
-        self.mapa.imprimir_vidas(self.pacman.vidas, screen)
-        self.pacman.dibujar(screen)
+        self.mapa.renderizar(self.screen)
+        self.mapa.imprimir_score(self.pacman.score, self.screen)
+        self.mapa.imprimir_vidas(self.pacman.vidas, self.screen)
+        self.pacman.dibujar(self.screen)
         for fantasma in self.fantasmas:
-            fantasma.dibujar(screen)
+            fantasma.dibujar(self.screen)
 
 
     def modo(self,dt):
@@ -393,7 +436,7 @@ class juego:
             self.fase_actual+=1
             for f in self.fantasmas:
                 f.direccion = (-f.direccion[0], -f.direccion[1])
-        def cargar_high_score(self) -> int: 
+    def cargar_high_score(self) -> int: 
             """
             Funcion para cargar el puntaje maximo
             
@@ -407,12 +450,29 @@ class juego:
             except FileNotFoundError: # si no existe el archivo
                 high_score = 0  # seteamos el puntaje maximo en 0
                 return high_score
-        def actualizar_high_score(self):
+    def actualizar_high_score(self):
             """
             Funcion para actualizar el puntaje maximo
             """
             with open("high_score.txt", "w") as f:
-                f.write(str(self.puntos))
+                f.write(str(self.pacman.score))
+    def correr(self):
+        while self.running:
+            dt = self.clock.tick(60)/1000
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                self.manejar_llaves(event)
+            if self.estado == 'inicio':
+                self.pantalla_inicio(dt)
+
+            else:
+                self.screen.fill((0, 0, 0))
+                self.dibujar()
+                self.update(dt)
+            pygame.display.flip()
+
+
         
         
 
@@ -428,20 +488,11 @@ class juego:
 
 
 pygame.init()
-screen = pygame.display.set_mode((672, 744))
-clock = pygame.time.Clock()
-running = True
-g = juego()
 
-while g.running:
-    dt = clock.tick(60) / 1000
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            g.running = False
-    screen.fill((0, 0, 0))
-    g.dibujar(screen)
-    g.update(dt)
-    pygame.display.flip()
+g = juego()
+g.correr()
+
+
 
 
 
