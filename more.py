@@ -68,6 +68,16 @@ class mapa:
         fuente = pygame.font.SysFont('arial', 24)
         texto = fuente.render(f'Score: {score}', True, (255, 255, 255))
         screen.blit(texto, (10, 10))
+    def imprimir_vidas(self, vidas, screen):
+        if vidas == 1: # si quedan 1 vidas
+            pygame.draw.circle(screen,(255, 217, 0), (50, 675), 10) # dibujamos las vidas en la pantalla
+        elif vidas == 2: # si quedan 2 vidas
+            pygame.draw.circle(screen,(255, 217, 0), (50, 675), 10) # dibujamos las vidas en la pantalla
+            pygame.draw.circle(screen,(255, 217, 0), (80, 675), 10)
+        else: # si quedan 3 vidas
+            pygame.draw.circle(screen,(255, 217, 0), (50, 675), 10)
+            pygame.draw.circle(screen,(255, 217, 0), (80, 675), 10)   # dibujamos las vidas en la pantalla
+            pygame.draw.circle(screen,(255, 217, 0), (110, 675), 10)
 
 class pacman:
     def __init__(self, fil, col, mapa):
@@ -354,11 +364,20 @@ class juego:
             fantasma.mover(self.pacman.fil, self.pacman.col,self.pacman.prox_direc, dt)
         self.colosiones()
     def dibujar(self, screen):
+        if self.pacman.vidas == 0: # si no quedan vidas
+            screen.fill((0,0,0))
+            fuente = pygame.font.SysFont("Courier", 60)  # seteamos la fuente para el txto
+            texto_game_over = fuente.render("GAME OVER", True, (255, 255, 255)) # guardamos el mensaje game over
+            screen.blit(texto_game_over, (120,275)) # mostramos el mensaje game over
+            return
         self.mapa.renderizar(screen)
         self.mapa.imprimir_score(self.pacman.score, screen)
+        self.mapa.imprimir_vidas(self.pacman.vidas, screen)
         self.pacman.dibujar(screen)
         for fantasma in self.fantasmas:
             fantasma.dibujar(screen)
+
+
     def modo(self,dt):
         if self.fase_actual >= len(self.fases):
             return
@@ -374,6 +393,26 @@ class juego:
             self.fase_actual+=1
             for f in self.fantasmas:
                 f.direccion = (-f.direccion[0], -f.direccion[1])
+        def cargar_high_score(self) -> int: 
+            """
+            Funcion para cargar el puntaje maximo
+            
+            Returns:
+                int: puntaje maximo
+            """
+            try:
+                with open("high_score.txt", "r") as f:
+                    high_score = int(f.read()) # gyuardamos el puntaje maximo
+                    return high_score
+            except FileNotFoundError: # si no existe el archivo
+                high_score = 0  # seteamos el puntaje maximo en 0
+                return high_score
+        def actualizar_high_score(self):
+            """
+            Funcion para actualizar el puntaje maximo
+            """
+            with open("high_score.txt", "w") as f:
+                f.write(str(self.puntos))
         
         
 
@@ -409,3 +448,4 @@ while g.running:
 
 
 
+  
