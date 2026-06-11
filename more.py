@@ -326,7 +326,7 @@ class juego:
         self.estado = 'inicio'
         self.mostrar_enter = True
         self.timer_enter = 0
-        self.screen = pygame.display.set_mode((len(self.mapa.mapa) * 24, (len(self.mapa.mapa[0]) * 24) + 50 + 30))
+        self.screen = pygame.display.set_mode((672, 744 + 50))  
         self.fases = [('scatter', 7),
                         ('chase', 20),
                         ('scatter', 7),
