@@ -193,7 +193,7 @@ class fantasma:
             self.ojos = False
         if self.salio ==False:
             if not self.mapa.es_ghost_house(self.fil, self.col):
-                self.salio = True
+                self.salio =  True
             else:
                 self.fil -= 1
                 self.x = self.col * 24

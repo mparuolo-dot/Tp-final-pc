@@ -48,16 +48,15 @@ class Pacman(Personajes):
         self.tiempo_de_power_pellet = 0 # seteamos el tiempo de duracion del power_pellet
         self.direccion = ""  # seteamos la direccion de pacman para usar en mover
         self.proxima_direccion = ""  # seteamos la proxima direccion de pacman para usar en mover
-        self.pacman_boca_cerrada = pygame.transform.scale(pygame.image.load("pacman_boca_cerrada.png"), (tamaño_pixel, tamaño_pixel))
-        self.pacman_boca_abierta_parcial = pygame.transform.scale(pygame.image.load("pacman_boca_abierta.png"), (tamaño_pixel, tamaño_pixel))
-        self.pacman_boca_abierta = pygame.transform.scale(pygame.image.load("pacman_boca_abierta_total.png"), (tamaño_pixel, tamaño_pixel))
-        self.pacman_boca_cerrada_parcial = pygame.transform.scale(pygame.image.load("pacman_boca_cerrada_parcial.png"), (tamaño_pixel, tamaño_pixel))
+        self.pacman_boca_cerrada = pygame.transform.scale(pygame.image.load("boca_cerrada.png"), (tamaño_pixel, tamaño_pixel))
+        self.pacman_boca_abierta = pygame.transform.scale(pygame.image.load("boca_abierta.png"), (tamaño_pixel, tamaño_pixel))
+        self.pacman_boca_cerrada_parcial = pygame.transform.scale(pygame.image.load("boca_semiabierta.png"), (tamaño_pixel, tamaño_pixel))
         self.contador_fps_dibujo = 0
         self.mostrar_pacman = self.pacman_boca_abierta
         self.direccion_para_imagen= "derecha"
         self.rotacion = 0
     
-    def mover(self,velocidad : int):
+    def mover(self,velocidad :int, dt : int):
         """
         Funcion para mover el pacman en la pantalla
         
@@ -66,6 +65,7 @@ class Pacman(Personajes):
         """
         claves = pygame.key.get_pressed()    # obtenemos las teclas presionadas         
         velocidad_tiles = 1 # seteamos la velocidad de pacman en tiles diferenciada de la velocidad en pixeles
+        velocidad_pixeles = velocidad * 60
         if claves[pygame.K_LEFT]:
             self.proxima_direccion = "izquierda" 
         elif claves[pygame.K_RIGHT]:
@@ -74,7 +74,7 @@ class Pacman(Personajes):
             self.proxima_direccion = "arriba"
         elif claves[pygame.K_DOWN]:
             self.proxima_direccion = "abajo"
-        if self.x % tamaño_pixel < velocidad and self.y % tamaño_pixel < velocidad:    # verificamos si el pacman esta cerca del centro de un tile dependiendo de la velocidad
+        if self.x % tamaño_pixel < velocidad_pixeles * dt and self.y % tamaño_pixel < velocidad_pixeles * dt:    # verificamos si el pacman esta cerca del centro de un tile dependiendo de la velocidad
             self.x = int(self.x // tamaño_pixel) * tamaño_pixel
             self.y = int(self.y // tamaño_pixel) * tamaño_pixel  #sacamos decimales y lo multiplicamos por el tamaño de los pixeles para qeu no se superponga con paredes
             proxima_doblar_x = self.x // tamaño_pixel
@@ -122,13 +122,13 @@ class Pacman(Personajes):
                 self.direccion = ""
 
         if self.direccion == "izquierda":
-            self.x -= velocidad
+            self.x -= velocidad_pixeles * dt
         elif self.direccion == "derecha":
-            self.x += velocidad
+            self.x += velocidad_pixeles * dt
         elif self.direccion == "arriba":            # dependiendo la direccion restamos o summamos la velocidad en pixeles que es lo que mopstramos en pantalla
-            self.y -= velocidad   
+            self.y -= velocidad_pixeles * dt   
         elif self.direccion == "abajo":
-            self.y += velocidad
+            self.y += velocidad_pixeles * dt
 
         if self.x < 0:                            # si llegamos al tunel por la izquierda
             self.x = (largo_fila - 1) * tamaño_pixel  #seteamos posicion al tunel de la derecha
@@ -179,20 +179,20 @@ class Pacman(Personajes):
             self.power_pellet = False 
             return self.power_pellet 
         
-    def dibujar(self):
+    def dibujar(self,dt):
         """
         Funcion para dibujar el pacman en la pantalla
         """
-        self.contador_fps_dibujo += 1 #sumamos uno por cada fps
+        self.contador_fps_dibujo +=  1 #sumamos uno por cada fps
         if self.contador_fps_dibujo == 0: 
             self.mostrar_pacman = self.pacman_boca_abierta
-        elif self.contador_fps_dibujo == 15: 
-            self.mostrar_pacman = self.pacman_boca_abierta_parcial
-        elif self.contador_fps_dibujo == 30: 
-            self.mostrar_pacman = self.pacman_boca_cerrada_parcial 
-        elif self.contador_fps_dibujo == 45:
+        elif self.contador_fps_dibujo == 20 : 
+            self.mostrar_pacman = self.pacman_boca_cerrada_parcial
+        elif self.contador_fps_dibujo == 40 : 
             self.mostrar_pacman = self.pacman_boca_cerrada
             self.contador_fps_dibujo = 0
+        
+
 
         if self.direccion_para_imagen == "arriba":
             self.rotacion = 90
@@ -488,6 +488,7 @@ class Juego:
         """
         running = True # seteamos la variable running de qu8e esta corriendo el juego a true
         while running: # mientras el juego este corriendo
+            dt = self.fps.tick(60) / 1000.0  # en segundos
             for event in pygame.event.get():  # obtenemos los eventos para ver si cierra la pantalla la persona
                 if event.type == pygame.QUIT:  # si la persona cierra la pantalla
                     running = False  # seteamos running a false para que pare el juego
@@ -552,13 +553,13 @@ class Juego:
                             pygame.draw.circle(self.pantalla,color,centro_pixel, 4)  # dibujamos la comida arriba de ese tile en el centro
                         else:
                             pygame.draw.rect(self.pantalla,color,lugar) # para cualquier otro elemento en base a su palaeta de colores y posciion lo dibujamos en panatlla
-                self.pacman.dibujar() # dibujamos pacman
+                self.pacman.dibujar(dt) # dibujamos pacman
                 score = self.pacman.comer() # obtenemos el puntaje de la comida si el pacman come
                 if self.pacman.ver_power_pellet() == True: # verificamos si el power_pellet esta activo
                     velocidad =  2.25 # si esta activo seteamos la velocidad de pacman a 2
                 else:
                     velocidad = 2 # si no esta activo seteamos la velocidad de pacman a 1
-                self.pacman.mover(velocidad) # movemos pacman 
+                self.pacman.mover(velocidad, dt) # movemos pacman 
             
                 if score == None: # si score es None
                     score = 0 # seteamos score a 0
@@ -572,7 +573,6 @@ class Juego:
 
                 self.puntaje.mostrar() # mostramos el puntaje y el puntaje maximo
                 pygame.display.flip() # actualizamos la pantalla
-                self.fps.tick(60)  # seteamos los fps a 60
         self.puntaje.actualizar_high_score() # guardamos el puntaje maximo cada que termina la partida
         pygame.quit() # cerramos la pantalla
 
