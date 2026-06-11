@@ -1,504 +1,535 @@
 import pygame
+import math
+import random
+
+# --- CONFIGURACIÓN Y PALETA ---
 paleta_colores = {
-    "X" : (0,0,0),
-    "." : (255,255,255),
-    " " : (196, 181, 183),
-    "G" : (21, 83, 201),        # seteamos la paleta de colores para cada signo
-    "-" : (247, 22, 56),
-    "o" : (255,255,255),
-    "P" : (196, 181, 183),
-    "T" : (18, 202, 247)
+    "X" : (0, 0, 150),        # Paredes (Azul para que se vea mejor)
+    "." : (255, 255, 255),    # Comida pequeña
+    " " : (0, 0, 0),          # Fondo negro
+    "G" : (0, 0, 0),          # Casa de fantasmas
+    "-" : (255, 255, 0),      # Puerta casa
+    "o" : (255, 255, 255),    # Power Pellet
+    "P" : (0, 0, 0),          # Inicio Pacman
+    "T" : (0, 0, 0)           # Túnel
 }
 
-        
 largo_fila = 28
-alto_mapa = 31      #seteamos los parametros del mapa y agregados y el tamaño de los pixeles
+alto_mapa = 31
 tamaño_pixel = 20
 tamaño_score = 60
 
-
+# --- CLASES ---
 
 class Personajes:   
-    """
-    clase para los personajes del juego
-    
-    Args:
-        mapa (list): mapa del juego
-    """
-    def __init__(self,mapa,pantalla):
+    """ Clase base para todos los personajes """
+    def __init__(self, mapa, pantalla):
         self.mapa = mapa  
         self.pantalla = pantalla
+
 class Pacman(Personajes): 
-    """
-    clase para el pacman 
-    
-    Args:
-        Personajes (class): clase para los personajes del juego
-    """
-    def __init__(self,x: int,y: int , mapa, pantalla):
-        """   
-        Args:
-            x (int): posicion x del pacman en tiles
-            y (int): posicion y del pacman en tiles
-        """
+    def __init__(self, x: int, y: int, mapa, pantalla):
         Personajes.__init__(self, mapa , pantalla)
-        self.x = x * tamaño_pixel   # seteamos la posicion de pacman en pixeles cuando x e y los teniamos en tiles del mapa
+        # Seteamos posición inicial en píxeles
+        self.x = x * tamaño_pixel   
         self.y = y * tamaño_pixel    
-        self.power_pellet = False  #seteamos el valor de power_pellet 
-        self.tiempo_de_power_pellet = 0 # seteamos el tiempo de duracion del power_pellet
-        self.direccion = ""  # seteamos la direccion de pacman para usar en mover
-        self.proxima_direccion = ""  # seteamos la proxima direccion de pacman para usar en mover
+        self.power_pellet = False  
+        self.tiempo_de_power_pellet = 0 
+        self.direccion = ""  
+        self.proxima_direccion = ""  
         
-    def mover(self,velocidad : int):
-        """
-        Funcion para mover el pacman en la pantalla
+        # Intentamos cargar imágenes (si no están, el juego fallará, asegúrate de tener los .png)
+        try:
+            self.pacman_boca_cerrada = pygame.transform.scale(pygame.image.load("boca_cerrada.png"), (tamaño_pixel, tamaño_pixel))
+            self.pacman_boca_abierta = pygame.transform.scale(pygame.image.load("boca_abierta.png"), (tamaño_pixel, tamaño_pixel))
+            self.pacman_boca_cerrada_parcial = pygame.transform.scale(pygame.image.load("boca_semiabierta.png"), (tamaño_pixel, tamaño_pixel))
+        except:
+            # Fallback por si no hay imágenes (un círculo amarillo)
+            self.pacman_boca_abierta = pygame.Surface((tamaño_pixel, tamaño_pixel))
+            self.pacman_boca_abierta.fill((255, 255, 0))
+            self.pacman_boca_cerrada = self.pacman_boca_abierta
+            self.pacman_boca_cerrada_parcial = self.pacman_boca_abierta
+
+        self.contador_fps_dibujo = 0
+        self.mostrar_pacman = self.pacman_boca_abierta
+        self.direccion_para_imagen = "derecha"
+        self.rotacion = 0
+    
+    def mover(self, velocidad: int, dt: float):
+        claves = pygame.key.get_pressed()         
+        velocidad_tiles = 1 
+        velocidad_pixeles = velocidad * 60
         
-        Args:
-            velocidad (int): velocidad del pacman
-        """
-        claves = pygame.key.get_pressed()    # obtenemos las teclas presionadas         
-        velocidad_tiles = 1 # seteamos la velocidad de pacman en tiles diferenciada de la velocidad en pixeles
+        # Lectura de inputs
         if claves[pygame.K_LEFT]:
             self.proxima_direccion = "izquierda" 
         elif claves[pygame.K_RIGHT]:
             self.proxima_direccion = "derecha" 
-        elif claves[pygame.K_UP]:                       # Guardamos la proxima direccion de pacman en base al input de las teclas
+        elif claves[pygame.K_UP]:                       
             self.proxima_direccion = "arriba"
         elif claves[pygame.K_DOWN]:
             self.proxima_direccion = "abajo"
-        if self.x % tamaño_pixel < velocidad and self.y % tamaño_pixel < velocidad:    # verificamos si el pacman esta cerca del centro de un tile dependiendo de la velocidad
+
+        # Lógica de doblar (solo cuando está centrado en un tile)
+        if self.x % tamaño_pixel < velocidad_pixeles * dt and self.y % tamaño_pixel < velocidad_pixeles * dt:
             self.x = int(self.x // tamaño_pixel) * tamaño_pixel
-            self.y = int(self.y // tamaño_pixel) * tamaño_pixel  #sacamos decimales y lo multiplicamos por el tamaño de los pixeles para qeu no se superponga con paredes
-            proxima_doblar_x = self.x // tamaño_pixel
-            proxima_doblar_y = self.y // tamaño_pixel  # para verificar las paredes y a donde tenemos que ir volvemos a pasar de pixeles a tiles
+            self.y = int(self.y // tamaño_pixel) * tamaño_pixel  
+            
+            tile_x = self.x // tamaño_pixel
+            tile_y = self.y // tamaño_pixel
 
-            if self.proxima_direccion == "izquierda":
-                proxima_doblar_x -= velocidad_tiles
-            elif self.proxima_direccion == "derecha":
-                proxima_doblar_x += velocidad_tiles
-            elif self.proxima_direccion == "arriba":   # dependiendo la direccion restamos o sumamos la velocidad de tiles a la proxima direccion
-                proxima_doblar_y -= velocidad_tiles
-            elif self.proxima_direccion == "abajo":
-                proxima_doblar_y += velocidad_tiles
+            # Probar si puede doblar a la dirección deseada
+            proxima_x, proxima_y = tile_x, tile_y
+            if self.proxima_direccion == "izquierda": proxima_x -= velocidad_tiles
+            elif self.proxima_direccion == "derecha": proxima_x += velocidad_tiles
+            elif self.proxima_direccion == "arriba": proxima_y -= velocidad_tiles
+            elif self.proxima_direccion == "abajo": proxima_y += velocidad_tiles
 
-
-            if self.mapa[proxima_doblar_y ][proxima_doblar_x % largo_fila] != "X":  # verificamos si la proxima posicion a doblar es una pared y si no es guardamos la direccion
+            # Si no hay pared en la dirección deseada, doblamos
+            if self.mapa[proxima_y][proxima_x % largo_fila] != "X":
                 self.direccion = self.proxima_direccion
 
-            #la parte anteriror la usamos para verificar si podiamos doblar o no y la parte siguiente si no podemos doblar la usamos para ver si podemos avanzar en la direccion guardada
+            # Verificar si chocamos de frente en la dirección actual
+            adelante_x, adelante_y = tile_x, tile_y
+            if self.direccion == "izquierda": adelante_x -= velocidad_tiles
+            elif self.direccion == "derecha": adelante_x += velocidad_tiles
+            elif self.direccion == "arriba": adelante_y -= velocidad_tiles
+            elif self.direccion == "abajo": adelante_y += velocidad_tiles
 
-            proximo_bloque_adelante_x = self.x // tamaño_pixel
-            proximo_bloque_adelante_y = self.y // tamaño_pixel  # para verificar las paredes y a donde tenemos que ir volvemos a pasar de pixeles a tiles
-
-            if self.direccion == "izquierda":
-                proximo_bloque_adelante_x -= velocidad_tiles
-            elif self.direccion == "derecha":
-                proximo_bloque_adelante_x += velocidad_tiles
-            elif self.direccion == "arriba":                        # dependiendo la direccion restamos o summamos la velocidad de tiles a la proxima direccion
-                proximo_bloque_adelante_y -= velocidad_tiles
-            elif self.direccion == "abajo":
-                proximo_bloque_adelante_y += velocidad_tiles
-
-
-            if self.mapa[proximo_bloque_adelante_y][proximo_bloque_adelante_x % largo_fila] == "X": # vemos si el bloque al que avanzamos es una pared si es guarsdamops una direciion vacia para no movernos  usamos % largo_fila para que no se salga del mapa
+            if self.mapa[adelante_y][adelante_x % largo_fila] == "X":
                 self.direccion = ""
 
+        # Aplicar movimiento
         if self.direccion == "izquierda":
-            self.x -= velocidad
+            self.x -= velocidad_pixeles * dt
+            self.direccion_para_imagen = "izquierda"
         elif self.direccion == "derecha":
-            self.x += velocidad
-        elif self.direccion == "arriba":            # dependiendo la direccion restamos o summamos la velocidad en pixeles que es lo que mopstramos en pantalla
-            self.y -= velocidad   
+            self.x += velocidad_pixeles * dt
+            self.direccion_para_imagen = "derecha"
+        elif self.direccion == "arriba":
+            self.y -= velocidad_pixeles * dt   
+            self.direccion_para_imagen = "arriba"
         elif self.direccion == "abajo":
-            self.y += velocidad
+            self.y += velocidad_pixeles * dt
+            self.direccion_para_imagen = "abajo"
 
-        if self.x < 0:                            # si llegamos al tunel por la izquierda
-            self.x = (largo_fila - 1) * tamaño_pixel  #seteamos posicion al tunel de la derecha
-        elif self.x > (largo_fila - 1) * tamaño_pixel:   # si llegamos al tunel por derecha
-            self.x = 0  #seteamos posicion al tunel de la izquierda
+        # Teletransporte túnel
+        if self.x < 0:
+            self.x = (largo_fila - 1) * tamaño_pixel
+        elif self.x > (largo_fila - 1) * tamaño_pixel:
+            self.x = 0
 
-    
-
-        
-
-       
     def comer(self) -> int: 
-        """
-        Funcion para comer comida y devolver el valor de la comida
-        
-        Returns:
-            int: valor de la comida
-        """
-        if self.x % tamaño_pixel < 4 and self.y % tamaño_pixel < 4:    # verificamos si el pacman esta cerca del centro el tile en pixeles para qeu pueda comer en base a veloidades
+        if self.x % tamaño_pixel < 8 and self.y % tamaño_pixel < 8:
             fila = int(self.y // tamaño_pixel)
-            columna = int(self.x // tamaño_pixel)  # para verificar las comida pasamos de pixeles a tiles
-            if self.mapa[fila][columna] == ".": # verificamos si el tile es comida chica
-                self.mapa[fila][columna] = " "  # seteamos el tile vacio
-                return 10  # devolvemos el valor de la comida
+            columna = int(self.x // tamaño_pixel)
             
-            elif self.mapa[fila][columna] == "o":  # verificamos si el tile es comida grande      
-                self.mapa[fila][columna] = " "  # seteamos el tile vacio
-                self.power_pellet = True  # seteamos el power_pellet a true 
-                self.tiempo_de_power_pellet = 360  # seteamos el tiempo de duracion del power_pellet en frames 60*6
-                return 50  # devolvemos el valor de la comida
+            char = self.mapa[fila][columna]
+            if char == ".":
+                self.mapa[fila][columna] = " "
+                return 10
+            elif char == "o":
+                self.mapa[fila][columna] = " "
+                self.power_pellet = True
+                self.tiempo_de_power_pellet = 480 # Aumentamos tiempo (8 segundos aprox)
+                return 50
+        return 0
+            
     def ver_power_pellet(self) -> bool:
-        """
-        Funcion para verificar si el power_pellet esta activo
-        
-        Returns:
-            bool: si el power_pellet esta activo o no
-        """
-        if self.tiempo_de_power_pellet > 0:  # verificamos si el power_pellet esta activo
-            self.tiempo_de_power_pellet -= 1  # restamos 1 a la duracion del power_pellet por cada frame
-            if self.tiempo_de_power_pellet == 0:  # verificamos si el power_pellet termino
-                self.power_pellet = False  # seteamos el power_pellet a false
-                return self.power_pellet  # devolvemos el power_pellet = False
-            else:  # si el power_pellet no termino
-                self.power_pellet = True  # lo dejamos en true al power_pellet
-                return self.power_pellet  # devolvemos el power_pellet = True
+        if self.tiempo_de_power_pellet > 0:
+            self.tiempo_de_power_pellet -= 1
+            self.power_pellet = True
+            return True
         else:
             self.power_pellet = False 
-            return self.power_pellet 
+            return False
         
-    def dibujar(self):
-        """
-        Funcion para dibujar el pacman en la pantalla
-        """
-        pygame.draw.circle(self.pantalla,(255, 217, 0), (int(self.x) +10, int(self.y) + tamaño_score ), 10) # dibujamos el pacman en la pantalla teniendo en cuenta el espacio del score y el + 10 para que quede en el medio del tile
+    def dibujar(self, dt):
+        self.contador_fps_dibujo += 1
+        if self.contador_fps_dibujo >= 60:
+            self.contador_fps_dibujo = 0
+            
+        # Animación básica de boca
+        if self.contador_fps_dibujo < 20:
+            self.mostrar_pacman = self.pacman_boca_abierta
+        elif self.contador_fps_dibujo < 40:
+            self.mostrar_pacman = self.pacman_boca_cerrada_parcial
+        else:
+            self.mostrar_pacman = self.pacman_boca_cerrada
 
-class fantasmas(Personajes):
-    def __init__(self):
-        Personajes.__init__(self)
+        # Rotación según dirección
+        img_a_dibujar = self.mostrar_pacman
+        if self.direccion_para_imagen == "arriba":
+            img_a_dibujar = pygame.transform.rotate(self.mostrar_pacman, 90)
+        elif self.direccion_para_imagen == "abajo":
+            img_a_dibujar = pygame.transform.rotate(self.mostrar_pacman, 270)
+        elif self.direccion_para_imagen == "izquierda":
+            img_a_dibujar = pygame.transform.flip(self.mostrar_pacman, True, False)
+        
+        self.pantalla.blit(img_a_dibujar, (int(self.x), int(self.y) + tamaño_score - 10))
+
+class Fantasma(Personajes):
+    def __init__(self, x, y, mapa, pantalla, color, nombre, esquina_nombre):
+        Personajes.__init__(self, mapa, pantalla)
+        self.x = x * tamaño_pixel
+        self.y = y * tamaño_pixel
+        self.color = color
+        self.nombre = nombre
+        self.direccion = "arriba"
+        self.velocidad = 1.8
+        self.frightened = False
+        
+        # Definimos las coordenadas de las esquinas del mapa para el modo dispersión
+        self.objetivos_esquinas = {
+            "Arriba Izquierda": (1, 1),
+            "Arriba Derecha": (largo_fila - 2, 1),
+            "Abajo Izquierda": (1, alto_mapa - 2),
+            "Abajo Derecha": (largo_fila - 2, alto_mapa - 2)
+        }
+        self.esquina_objetivo = self.objetivos_esquinas[esquina_nombre]
+
+    def mover(self, pacman_x, pacman_y, power_pellet_activo, dt):
+        # Ajustamos velocidad si está asustado
+        v_actual = self.velocidad
+        if power_pellet_activo:
+            v_actual = 1.0
+            self.frightened = True
+        else:
+            self.frightened = False
+
+        velocidad_pixeles = v_actual * 60 * dt
+
+        # Solo decide dirección cuando está centrado en el tile
+        if self.x % tamaño_pixel == 0 and self.y % tamaño_pixel == 0:
+            fila = int(self.y // tamaño_pixel)
+            col = int(self.x // tamaño_pixel)
+
+            # El objetivo cambia según el estado
+            if power_pellet_activo:
+                # Objetivo aleatorio
+                target_x, target_y = random.randint(0, largo_fila), random.randint(0, alto_mapa)
+            else:
+                # Alternar entre perseguir a Pacman y su esquina (simple)
+                if random.random() > 0.8: # 20% del tiempo va a su esquina
+                    target_x, target_y = self.esquina_objetivo
+                else:
+                    target_x, target_y = pacman_x // tamaño_pixel, pacman_y // tamaño_pixel
+
+            posibles_direcciones = []
+            # Chequeamos las 4 direcciones (evitando volver atrás)
+            direcciones = [
+                ("arriba", 0, -1, "abajo"),
+                ("abajo", 0, 1, "arriba"),
+                ("izquierda", -1, 0, "derecha"),
+                ("derecha", 1, 0, "izquierda")
+            ]
+
+            for nombre_dir, dx, dy, opuesta in direcciones:
+                if self.direccion != opuesta: # No puede dar la vuelta 180°
+                    nx, ny = col + dx, fila + dy
+                    if 0 <= ny < alto_mapa and self.mapa[ny][nx % largo_fila] != "X":
+                        distancia = math.sqrt((nx - target_x)**2 + (ny - target_y)**2)
+                        posibles_direcciones.append((nombre_dir, distancia))
+
+            if posibles_direcciones:
+                # Elegimos la que tenga menor distancia al objetivo
+                posibles_direcciones.sort(key=lambda x: x[1])
+                self.direccion = posibles_direcciones[0][0]
+
+        # Movimiento físico
+        if self.direccion == "arriba": self.y -= velocidad_pixeles
+        elif self.direccion == "abajo": self.y += velocidad_pixeles
+        elif self.direccion == "izquierda": self.x -= velocidad_pixeles
+        elif self.direccion == "derecha": self.x += velocidad_pixeles
+
+        # Túnel
+        if self.x < 0: self.x = (largo_fila - 1) * tamaño_pixel
+        elif self.x > (largo_fila - 1) * tamaño_pixel: self.x = 0
+
+    def dibujar(self):
+        # Si está asustado es azul, si no su color original
+        color_cuerpo = (0, 0, 255) if self.frightened else self.color
+        
+        pos_y_ajustada = int(self.y) + tamaño_score - 10
+        # Dibujamos un círculo con "patitas" (rectángulo abajo)
+        pygame.draw.circle(self.pantalla, color_cuerpo, (int(self.x) + 10, pos_y_ajustada + 10), 9)
+        pygame.draw.rect(self.pantalla, color_cuerpo, (int(self.x) + 1, pos_y_ajustada + 10, 18, 9))
+        
+        # Ojos
+        pygame.draw.circle(self.pantalla, (255, 255, 255), (int(self.x) + 6, pos_y_ajustada + 7), 3)
+        pygame.draw.circle(self.pantalla, (255, 255, 255), (int(self.x) + 14, pos_y_ajustada + 7), 3)
 
 class Puntaje:
     def __init__(self, score: int, pantalla):
-        """
-        Args:
-            score (int): puntaje del juego
-        """
         self.pantalla = pantalla
-        self.puntos = score #seteamos el puntaje
-        self.high_score =  self.cargar_high_score() # cargamos el puntaje maximo
-        self.vidas = 3 # seteamos las vidas
+        self.puntos = score
+        self.high_score = self.cargar_high_score()
+        self.vidas = 3
+        self.lvl = 1
+
     def cargar_high_score(self) -> int: 
-        """
-        Funcion para cargar el puntaje maximo
-        
-        Returns:
-            int: puntaje maximo
-        """
         try:
             with open("high_score.txt", "r") as f:
-                high_score = int(f.read()) # gyuardamos el puntaje maximo
-                return high_score
-        except FileNotFoundError: # si no existe el archivo
-            high_score = 0  # seteamos el puntaje maximo en 0
-            return high_score
+                return int(f.read())
+        except:
+            return 0
+
     def actualizar_high_score(self):
-        """
-        Funcion para actualizar el puntaje maximo
-        """
         with open("high_score.txt", "w") as f:
-            f.write(str(self.puntos))
-        
+            f.write(str(self.high_score))
 
     def actualizar_puntaje(self, score: int):
-        """
-        Funcion para actualizar el puntaje
-        
-        Args:
-            score (int): puntaje del juego
-        
-        Returns:
-            int: puntaje actualizado
-        """
-        self.puntos += score # sumamos el puntaje al puntaje inicial
-        if self.puntos > self.high_score: # si el puntaje actual es mayor al puntaje maximo
-            self.high_score = self.puntos # seteamos el puntaje maximo al puntaje actual
-        return self.puntos # devolvemos el puntaje actualizado
+        self.puntos += score
+        if self.puntos > self.high_score:
+            self.high_score = self.puntos
+        return self.puntos
+
+    def actualizar_lvl(self, lvl: int):
+        self.lvl += lvl
 
     def mostrar(self):
-        """
-        Funcion para mostrar el puntaje en la pantalla
+        fuente = pygame.font.SysFont("Courier", 35)
+        fuente_p = pygame.font.SysFont("Courier", 18)
         
-        """
-        fuente = pygame.font.SysFont("Courier", 40)  # seteamos la fuente para el txto
-        texto_score = fuente.render(f"{self.puntos}", True, (255, 255, 255)) # guardmaos los puntos
-        texto_high_score_texto = fuente.render("HIGH SCORE", True, (255, 255, 255)) # guardamos el mensaje high score
-        texto_high_score = fuente.render(f"{self.high_score}", True, (255, 255, 255)) # guradmaos el puntaje maximo
-        self.pantalla.blit(texto_score, (30,30)) # mostramos los ountois en la pantalla
-        self.pantalla.blit(texto_high_score_texto, (175,0)) # mostramos el mensaje highscore
-        self.pantalla.blit(texto_high_score, (175,30)) # mostramos el puntaje maximo
-        if self.vidas == 0: # si no quedan vidas
-            self.pantalla.fill((0,0,0))
-            fuente = pygame.font.SysFont("Courier", 60)  # seteamos la fuente para el txto
-            texto_game_over = fuente.render("GAME OVER", True, (255, 255, 255)) # guardamos el mensaje game over
-            self.pantalla.blit(texto_game_over, (120,275)) # mostramos el mensaje game over
-        elif self.vidas == 1: # si quedan 1 vidas
-            pygame.draw.circle(self.pantalla,(255, 217, 0), (50, 675), 10) # dibujamos las vidas en la pantalla
-        elif self.vidas == 2: # si quedan 2 vidas
-            pygame.draw.circle(self.pantalla,(255, 217, 0), (50, 675), 10) # dibujamos las vidas en la pantalla
-            pygame.draw.circle(self.pantalla,(255, 217, 0), (80, 675), 10)
-        elif self.vidas == 3: # si quedan 3 vidas
-            pygame.draw.circle(self.pantalla,(255, 217, 0), (50, 675), 10)
-            pygame.draw.circle(self.pantalla,(255, 217, 0), (80, 675), 10)   # dibujamos las vidas en la pantalla
-            pygame.draw.circle(self.pantalla,(255, 217, 0), (110, 675), 10)
+        txt_score = fuente.render(f"SCORE: {self.puntos}", True, (255, 255, 255))
+        txt_high = fuente.render(f"HIGH: {self.high_score}", True, (255, 255, 0))
+        txt_lvl = fuente_p.render(f"LEVEL: {self.lvl}", True, (255, 255, 255))
+        
+        self.pantalla.blit(txt_score, (20, 10))
+        self.pantalla.blit(txt_high, (250, 10))
+        self.pantalla.blit(txt_lvl, (480, 25))
 
+        # Dibujar vidas abajo
+        for i in range(self.vidas):
+            pygame.draw.circle(self.pantalla, (255, 217, 0), (30 + (i * 30), 710), 10)
 
 class Juego:
     def __init__(self):
-        """
-        Funcion para iniciar el juego
-        """
-        pygame.init()  # inicializamos la pantalla del pygame
-        self.pantalla = pygame.display.set_mode((largo_fila * tamaño_pixel, (alto_mapa * tamaño_pixel) + tamaño_score + 30))  # creamse la pantalla del juego
-        self.fps =  pygame.time.Clock() # creamos un objeto que usamos para los fps
-        self.puntaje = Puntaje(0, self.pantalla) # creamos un objeto de la clase Puntaje y lo seteamos para que empeize en 0 
-        self.empezar_mapa() # llamamos a la funcion para empezar el juego
+        pygame.init()
+        self.pantalla = pygame.display.set_mode((largo_fila * tamaño_pixel, (alto_mapa * tamaño_pixel) + tamaño_score + 50))
+        pygame.display.set_caption("Pac-Man TP Final")
+        self.fps = pygame.time.Clock()
+        self.puntaje = Puntaje(0, self.pantalla)
+        
         self.estado = "Inicio"
         self.mostrar_enter = True
-        self.fps_por_texto_enter = 0
-        self.fantasmas = [
-                {"nombre": "Blinky" ,"numero": "1", "color": (255, 0, 0), "desc": "Rojo - El perseguidor."},
-                {"nombre": "Pinky", "numero": "2",  "color": (255, 182, 193), "desc": "Rosa - El emboscador."},
-                {"nombre": "Inky", "numero": "3", "color": (0, 255, 255), "desc": "Celeste - El flanqueador."},
-                {"nombre": "Clyde", "numero": "4", "color": (255, 165, 0), "desc": "Naranja - El tímido."},
-                {"nombre": "Spike", "numero": "5","color": (0, 255, 0), "desc": "Verde - El interceptor."},
-                {"nombre": "Coward", "numero": "6", "color": (128, 0, 128), "desc": "Violeta - El cobarde."}
-            ]
-        self.fantasmas_seleccionados = []
-        self.esquinas_fantasma = []
-        self.posicion_fantasma_seleccionado = 0
-            
-            
+        self.timer_texto = 0
+        
+        # Datos de fantasmas posibles
+        self.info_fantasmas = [
+            {"nombre": "Blinky", "color": (255, 0, 0), "desc": "Rojo - Perseguidor"},
+            {"nombre": "Pinky", "color": (255, 182, 193), "desc": "Rosa - Emboscador"},
+            {"nombre": "Inky", "color": (0, 255, 255), "desc": "Celeste - Flanqueador"},
+            {"nombre": "Clyde", "color": (255, 165, 0), "desc": "Naranja - Tímido"},
+            {"nombre": "Spike", "color": (0, 255, 0), "desc": "Verde - Interceptor"},
+            {"nombre": "Coward", "color": (128, 0, 128), "desc": "Violeta - Cobarde"}
+        ]
+        
+        self.seleccionados = [] # Índices (1-6)
+        self.config_esquinas = [] # Lista de dicts con nombre y esquina
+        self.paso_esquinas = 0
+        self.objetos_fantasmas = []
+        
+        self.empezar_mapa()
 
-    def pantalla_inicio(self):
-        """
-        Funcion para mostrar la pantalla de inicio
-        """
-        self.pantalla.fill((0,0,0))
-        fuente_pacman = pygame.font.SysFont("Courier", 60)  # seteamos la fuente para el txto
-        fuente_high_score = pygame.font.SysFont("Courier", 30)
-        texto_Pacman = fuente_pacman.render("PACMAN", True, (255, 255, 0))
-        high_score = self.puntaje.cargar_high_score()
-        texto_high_score = fuente_high_score.render(f"HIGH SCORE", True, (255, 255, 255))
-        texto_high_score_numero = fuente_high_score.render(f"{high_score}", True, (255, 255, 0))
-        texto_enter = fuente_high_score.render("Presione enter para jugar", True, (255, 255,255))
-        self.pantalla.blit(texto_Pacman, (160,200))
-        self.pantalla.blit(texto_high_score, (175,30))
-        self.pantalla.blit(texto_high_score_numero, (240,80))
-        if self.mostrar_enter == True:
-            self.pantalla.blit(texto_enter, (65,425))
-        self.fps_por_texto_enter += 1
-        if self.fps_por_texto_enter >= 240: 
-            self.mostrar_enter = not self.mostrar_enter # invertimos valor cada 240 fps
-            self.fps_por_texto_enter = 0    
-        claves = pygame.key.get_pressed()
-        if claves[pygame.K_RETURN]:
-            self.estado = "Elegir Fantasmas"
-        pygame.display.flip()
-
-    def elegir_fantasmas(self):  
-        self.pantalla.fill((0,0,0))
-        fuente_texto_fantasma = pygame.font.SysFont("Courier", 30)
-        fuente_fantasmas = pygame.font.SysFont("Courier", 25)
-        fuente_descripcion = pygame.font.SysFont("Courier", 20)
-        poscion_y = 200
-        for fantasma in self.fantasmas:
-            numero = f"{fantasma['numero']}"
-            nombre_fantasma = f"{fantasma['nombre']}"
-            color_fantasma = fantasma["color"]
-            descripcion_fantasma = f"{fantasma['desc']}"
-            texto_nombre_fantasma = fuente_fantasmas.render(nombre_fantasma, True,color_fantasma)
-            texto_descripcion_fantasma = fuente_descripcion.render(descripcion_fantasma, True, (255, 255, 255))
-            texto_numero_fantasma = fuente_fantasmas.render(numero, True, (255, 255, 255))
-            self.pantalla.blit(texto_nombre_fantasma,(100, poscion_y))
-            self.pantalla.blit(texto_descripcion_fantasma,(100, poscion_y + 25))
-            self.pantalla.blit(texto_numero_fantasma,(80, poscion_y))
-            pygame.draw.circle(self.pantalla, color_fantasma, (60, poscion_y + 15), 10)            
-            poscion_y += 50
-        poscion_y_rectangulo = 200
-        alto_rectangulo = 50
-        for i in (self.fantasmas_seleccionados):
-            if i == 1:
-                rectangulo_blanco = pygame.Rect(70, poscion_y_rectangulo , 450, alto_rectangulo)
-                pygame.draw.rect(self.pantalla,(255, 255, 255), rectangulo_blanco, 2)
-            elif i == 2:
-                rectangulo_blanco = pygame.Rect(70, poscion_y_rectangulo + 50, 450, alto_rectangulo)
-                pygame.draw.rect(self.pantalla,(255, 255, 255), rectangulo_blanco, 2)
-            elif i == 3:
-                rectangulo_blanco = pygame.Rect(70, poscion_y_rectangulo + 100, 450, alto_rectangulo)
-                pygame.draw.rect(self.pantalla,(255, 255, 255), rectangulo_blanco, 2)
-            elif i == 4:
-                rectangulo_blanco = pygame.Rect(70, poscion_y_rectangulo + 150, 450, alto_rectangulo)
-                pygame.draw.rect(self.pantalla,(255, 255, 255), rectangulo_blanco, 2)
-            elif i == 5:
-                rectangulo_blanco = pygame.Rect(70, poscion_y_rectangulo + 200, 450, alto_rectangulo)
-                pygame.draw.rect(self.pantalla,(255, 255, 255), rectangulo_blanco, 2)
-            elif i == 6:
-                rectangulo_blanco = pygame.Rect(70, poscion_y_rectangulo + 250, 450, alto_rectangulo)
-                pygame.draw.rect(self.pantalla,(255, 255, 255), rectangulo_blanco, 2)
-
-        canitidad_elegida_fantasmas = fuente_texto_fantasma.render(f"Elegi 4 fantasmas [{len(self.fantasmas_seleccionados)}/4]", True, (255, 255, 0))
-        self.pantalla.blit(canitidad_elegida_fantasmas, (50, 30))
-        clave_inicio = pygame.key.get_pressed()
-        if len(self.fantasmas_seleccionados) == 4 and clave_inicio[pygame.K_RETURN]:         
-            self.estado = "Esquinas Fantasmas"
-   
-
-        pygame.display.flip()
-    def esquinas_fantasmas(self):
-        self.pantalla.fill((0,0,0))
-        fuente_texto = pygame.font.SysFont("Courier", 30)
-        fuente_esquinas = pygame.font.SysFont("Courier", 25)
-        fantasma_actual_inidce = self.fantasmas_seleccionados[self.posicion_fantasma_seleccionado]
-        nombre_fantasma_actual = f"{self.fantasmas[fantasma_actual_inidce - 1]['nombre']}"
-        color_fantasma_actual = self.fantasmas[fantasma_actual_inidce - 1]["color"]   
-        esquinas = ["Arriba Izquierda", "Arriba Derecha", "Abajo Izquierda", "Abajo Derecha"]
-        poscion_y = 200
-        num = 1
-        for esquina in esquinas:
-            self.pantalla.blit(fuente_esquinas.render(f"{num}.", True, (255, 255, 255)), (150, poscion_y))
-            self.pantalla.blit(fuente_esquinas.render(esquina, True, (255, 255, 255)), (180, poscion_y))
-            poscion_y += 75
-            num += 1
-        texto_eleccion = fuente_texto.render(f"Asigná una esquina a {nombre_fantasma_actual}", True, color_fantasma_actual)
-        self.pantalla.blit(texto_eleccion, (50, 50))
-        pygame.display.flip()
     def empezar_mapa(self):
-        """
-        Funcion para crear el mapa del juego
-        """
         self.mapa = []
         self.comida_faltante = 0
-        ghost_house = False
-        pacman_existencia = False
-        try:
-            with open("mapa.txt" , "r") as f:  # abrimos el archivo de texto con el mapa
-                for linea in f:
-                    self.mapa.append(list(linea.strip())) # guardamos cada linea de texto(fila) en una lista 
-                if len(self.mapa) != alto_mapa: # si el tamaño de la fila es diferente al tamaño del mapa establecido
-                    raise ValueError("El alto del mapa es incorrecto")         
-                for fila in range(alto_mapa):
-                    if len(self.mapa[fila]) != largo_fila: # si el tamaño de la filaes diferente al tamaño del mapa establecido
-                        raise ValueError("El largo del mapa es incorrecto")
-                    for columna in range(largo_fila):
-                        if self.mapa[fila][columna] not in paleta_colores.keys(): # si el caracter no esta en los posibles cracteres
-                            raise ValueError(f"El caracter {self.mapa[fila][columna]} es desconocido")
-                        if self.mapa[fila][columna] == "G": # si el caracter es Ghost house
-                            ghost_house = True # seteamos la variable ghost_house a true
-                        if self.mapa[fila][columna] == "P": # si el caracter es pacman
-                            pacman_existencia = True # seteamos la variable pacman_existencia a true
-                if ghost_house == False: # si no hay ghost house
-                    raise ValueError("No hay ghost house")
-                if pacman_existencia == False: # si no hay pacman
-                    raise ValueError("No hay pacman")
-                            
-        except FileNotFoundError:
-            raise FileNotFoundError("No se encontro el archivo")
+        with open("mapa.txt", "r") as f:
+            for linea in f:
+                self.mapa.append(list(linea.strip()))
+
+        pos_x, pos_y = 1, 1
+        self.pos_spawn_fantasmas = (13, 14) # Default centro casa
         
-        poscion_x_pacman = 0
-        poscion_y_pacman = 0
-        for fila in range(alto_mapa):
-            for columna in range(largo_fila):      #buscamos la posicion de pacman en el mapa
-                if self.mapa[fila][columna] == "P":
-                    poscion_x_pacman = columna
-                    poscion_y_pacman = fila             # obtenemos la posicion de pacman en el mapa
-                elif self.mapa[fila][columna] == "." or self.mapa[fila][columna] == "o":
-                    self.comida_faltante += 1  # contamos la cantidad de comida en el mapa
-        self.personajes = Personajes(self.mapa, self.pantalla)  # creamos un objeto de la clase Personajes para el mapa
-        self.pacman = Pacman(poscion_x_pacman,poscion_y_pacman,self.mapa, self.pantalla) # creamos un objeto de la clase Pacman con la posicion de pacman en el mapa y el mapa y la pantalla
+        for f in range(alto_mapa):
+            for c in range(largo_fila):
+                if self.mapa[f][c] == "P":
+                    pos_x, pos_y = c, f
+                elif self.mapa[f][c] == "G":
+                    self.pos_spawn_fantasmas = (c, f)
+                elif self.mapa[f][c] in [".", "o"]:
+                    self.comida_faltante += 1
+        
+        self.pacman = Pacman(pos_x, pos_y, self.mapa, self.pantalla)
+        
+        # Solo creamos fantasmas si ya pasamos la configuración
+        if self.estado == "Juego":
+            self.crear_fantasmas()
 
-
-    def correr_juego(self):               
-        """
-        Funcion para correr el juego
+    def crear_fantasmas(self):
+        self.objetos_fantasmas = []
+        for i in range(len(self.seleccionados)):
+            idx = self.seleccionados[i] - 1
+            datos = self.info_fantasmas[idx]
+            esquina = self.config_esquinas[i]["esquina"]
             
-        """
-        running = True # seteamos la variable running de qu8e esta corriendo el juego a true
-        while running: # mientras el juego este corriendo
-            for event in pygame.event.get():  # obtenemos los eventos para ver si cierra la pantalla la persona
-                if event.type == pygame.QUIT:  # si la persona cierra la pantalla
-                    running = False  # seteamos running a false para que pare el juego
-                if event.type == pygame.KEYDOWN and self.estado == "Elegir Fantasmas": # si el estado es elegir fantasmas
-                    if len(self.fantasmas_seleccionados) < 4: # si la cantidad de fantasmas seleccionados es menos de 4
-                        if event.key == pygame.K_1: # si la persona presiona 1
-                            if 1 not in self.fantasmas_seleccionados: # si el fantasma no esta en la lista de fantasmas seleccionados
-                                self.fantasmas_seleccionados.append(1) # agregamos el fantasma a la lista de fantasmas seleccionados
-                        elif event.key == pygame.K_2: # si la persona presiona 2
-                            if 2 not in self.fantasmas_seleccionados: # si el fantasma no esta en la lista de fantasmas seleccionados
-                                self.fantasmas_seleccionados.append(2) # agregamos el fantasma a la lista de fantasmas seleccionados
-                        elif event.key == pygame.K_3: # si la persona presiona 3
-                            if 3 not in self.fantasmas_seleccionados: # si el fantasma no esta en la lista de fantasmas seleccionados
-                                self.fantasmas_seleccionados.append(3) # agregamos el fantasma a la lista de fantasmas seleccionados
-                        elif event.key == pygame.K_4: # si la persona presiona 4
-                            if 4 not in self.fantasmas_seleccionados: # si el fantasma no esta en la lista de fantasmas seleccionados
-                                self.fantasmas_seleccionados.append(4) # agregamos el fantasma a la lista de fantasmas seleccionados
-                        elif event.key == pygame.K_5: # si la persona presiona 5
-                            if 5 not in self.fantasmas_seleccionados: # si el fantasma no esta en la lista de fantasmas seleccionados
-                                self.fantasmas_seleccionados.append(5) # agregamos el fantasma a la lista de fantasmas seleccionados
-                        elif event.key == pygame.K_6: # si la persona presiona 6
-                            if 6 not in self.fantasmas_seleccionados: # si el fantasma no esta en la lista de fantasmas seleccionados
-                                self.fantasmas_seleccionados.append(6) # agregamos el fantasma a la lista de fantasmas seleccionados
-                if event.type == pygame.KEYDOWN and self.estado == "Esquinas Fantasmas": # si el estado es esquinas de fantasmas
-                    fantasma_en_seleccionado_inidce = self.fantasmas_seleccionados[self.posicion_fantasma_seleccionado]
-                    nombre_fantasma_seleccionado = self.fantasmas[fantasma_en_seleccionado_inidce - 1]["nombre"]
-                    if event.key == pygame.K_1:
-                        self.esquinas_fantasma.append({"nombre": nombre_fantasma_seleccionado, "esquina": "Arriba Izquierda"})
-                    elif event.key == pygame.K_2:
-                        self.esquinas_fantasma.append({"nombre": nombre_fantasma_seleccionado, "esquina": "Arriba Derecha"})
-                    elif event.key == pygame.K_3:
-                        self.esquinas_fantasma.append({"nombre": nombre_fantasma_seleccionado, "esquina": "Abajo Izquierda"})
-                    elif event.key == pygame.K_4:
-                        self.esquinas_fantasma.append({"nombre": nombre_fantasma_seleccionado, "esquina": "Abajo Derecha"})
+            nuevo_f = Fantasma(
+                self.pos_spawn_fantasmas[0], 
+                self.pos_spawn_fantasmas[1],
+                self.mapa, self.pantalla,
+                datos["color"], datos["nombre"], esquina
+            )
+            self.objetos_fantasmas.append(nuevo_f)
 
-
-            if self.estado == "Inicio": # si el estado es inicio
-                self.pantalla_inicio()
-            elif self.estado == "Elegir Fantasmas": # si el estado es elegir fantasmas
-                self.elegir_fantasmas()
-            elif self.estado == "Esquinas Fantasmas": # si el estado es esquinas de fantasmas
-                self.esquinas_fantasmas()
-            elif self.estado == "Juego": # si el estado es juego
-                self.pantalla.fill((0,0,0))  # seteamos la pantalla a negro
-                for fila in range(alto_mapa):  
-                    for columna in range(largo_fila):   # recorremos el mapa
-                        color = paleta_colores[self.mapa[fila][columna]]  # obtenemos el color de la paleta de colores de cada fila,columna
-                        lugar = (columna * tamaño_pixel, fila * tamaño_pixel + tamaño_score -10, tamaño_pixel, tamaño_pixel)  # creamos el rectangulo.rect de cada tile
-                        centro_x = columna * tamaño_pixel + tamaño_pixel // 2 
-                        centro_y = fila * tamaño_pixel + tamaño_pixel // 2 + tamaño_score -10  # obtenemos el centro de cada tile en y tenemos en cuento el tamaño del score
-                        centro_pixel = (centro_x, centro_y)    #guardamops el centro de cada tile   
-                        if self.mapa[fila][columna] == ".": # si el tile es comida chica
-                            pygame.draw.rect(self.pantalla,(196, 181, 183),lugar) # dibujamos el tile en gris
-                            pygame.draw.circle(self.pantalla,color,centro_pixel, 2)  # dibujamos la comida arriba de ese tile en el centro
-                        elif self.mapa[fila][columna] == "o": # si el tile es comida grande
-                            pygame.draw.rect(self.pantalla,(196, 181, 183),lugar) # dibujamos el tile en gris
-                            pygame.draw.circle(self.pantalla,color,centro_pixel, 4)  # dibujamos la comida arriba de ese tile en el centro
-                        else:
-                            pygame.draw.rect(self.pantalla,color,lugar) # para cualquier otro elemento en base a su palaeta de colores y posciion lo dibujamos en panatlla
-                self.pacman.dibujar() # dibujamos pacman
-                score = self.pacman.comer() # obtenemos el puntaje de la comida si el pacman come
-                if self.pacman.ver_power_pellet() == True: # verificamos si el power_pellet esta activo
-                    velocidad = 2.25 # si esta activo seteamos la velocidad de pacman a 2
-                else:
-                    velocidad = 2 # si no esta activo seteamos la velocidad de pacman a 1
-                self.pacman.mover(velocidad) # movemos pacman 
+    def pantalla_inicio(self):
+        self.pantalla.fill((0, 0, 0))
+        f_titulo = pygame.font.SysFont("Courier", 60, bold=True)
+        f_sub = pygame.font.SysFont("Courier", 25)
+        
+        self.pantalla.blit(f_titulo.render("PAC-MAN", True, (255, 255, 0)), (150, 150))
+        
+        self.timer_texto += 1
+        if self.timer_texto % 60 < 30:
+            msg = f_sub.render("PRESIONE ENTER PARA EMPEZAR", True, (255, 255, 255))
+            self.pantalla.blit(msg, (70, 400))
             
-                if score == None: # si score es None
-                    score = 0 # seteamos score a 0
-                    self.puntaje.actualizar_puntaje(score) # actualizamos el puntaje
-                else:
-                    self.puntaje.actualizar_puntaje(score) # actualizamos el puntaje
-                    self.comida_faltante -= 1 # restamos 1 al contador de comida
-                    if self.comida_faltante == 0: # si no quedan mas comida
-                        self.empezar_mapa() # llamamos a la funcion para empezar denuevo
+        pygame.display.flip()
 
-                self.puntaje.mostrar() # mostramos el puntaje y el puntaje maximo
-                pygame.display.flip() # actualizamos la pantalla
-                self.fps.tick(60)  # seteamos los fps a 60
-        self.puntaje.actualizar_high_score() # guardamos el puntaje maximo cada que termina la partida
-        pygame.quit() # cerramos la pantalla
-
+    def menu_eleccion(self):
+        self.pantalla.fill((0, 0, 0))
+        fuente = pygame.font.SysFont("Courier", 22)
+        
+        self.pantalla.blit(fuente.render(f"Elegí 4 Fantasmas ({len(self.seleccionados)}/4)", True, (255, 255, 255)), (50, 50))
+        
+        for i in range(len(self.info_fantasmas)):
+            color = self.info_fantasmas[i]["color"]
+            nombre = self.info_fantasmas[i]["nombre"]
+            desc = self.info_fantasmas[i]["desc"]
+            
+            # Si está seleccionado, dibujar un recuadro
+            if (i + 1) in self.seleccionados:
+                pygame.draw.rect(self.pantalla, (255, 255, 255), (40, 100 + (i*50), 480, 45), 2)
                 
-juego = Juego() # creamos un objeto de la clase Juego
-juego.correr_juego()
+            self.pantalla.blit(fuente.render(f"{i+1}. {nombre}", True, color), (60, 110 + (i*50)))
+            self.pantalla.blit(fuente.render(desc, True, (150, 150, 150)), (200, 110 + (i*50)))
+
+        if len(self.seleccionados) == 4:
+            self.pantalla.blit(fuente.render("PRESIONA ENTER PARA CONTINUAR", True, (255, 255, 0)), (80, 500))
+
+        pygame.display.flip()
+
+    def menu_esquinas(self):
+        self.pantalla.fill((0, 0, 0))
+        fuente = pygame.font.SysFont("Courier", 25)
+        
+        # Cuál fantasma estamos configurando
+        indice_f = self.seleccionados[self.paso_esquinas] - 1
+        datos = self.info_fantasmas[indice_f]
+        
+        self.pantalla.blit(fuente.render(f"Esquina para: {datos['nombre']}", True, datos["color"]), (50, 100))
+        
+        opciones = ["1. Arriba Izquierda", "2. Arriba Derecha", "3. Abajo Izquierda", "4. Abajo Derecha"]
+        for i in range(4):
+            self.pantalla.blit(fuente.render(opciones[i], True, (255, 255, 255)), (100, 200 + (i*60)))
+            
+        pygame.display.flip()
+
+    def bucle_principal(self):
+        running = True
+        while running:
+            dt = self.fps.tick(60) / 1000.0
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                
+                if event.type == pygame.KEYDOWN:
+                    if self.estado == "Inicio" and event.key == pygame.K_RETURN:
+                        self.estado = "Eleccion"
+                    
+                    elif self.estado == "Eleccion":
+                        if pygame.K_1 <= event.key <= pygame.K_6:
+                            num = event.key - pygame.K_0
+                            if num not in self.seleccionados and len(self.seleccionados) < 4:
+                                self.seleccionados.append(num)
+                        if event.key == pygame.K_RETURN and len(self.seleccionados) == 4:
+                            self.estado = "Esquinas"
+                    
+                    elif self.estado == "Esquinas":
+                        if pygame.K_1 <= event.key <= pygame.K_4:
+                            opciones = ["Arriba Izquierda", "Arriba Derecha", "Abajo Izquierda", "Abajo Derecha"]
+                            esq = opciones[event.key - pygame.K_1]
+                            self.config_esquinas.append({"esquina": esq})
+                            self.paso_esquinas += 1
+                            if self.paso_esquinas == 4:
+                                self.estado = "Juego"
+                                self.crear_fantasmas()
+
+            if self.estado == "Inicio":
+                self.pantalla_inicio()
+            elif self.estado == "Eleccion":
+                self.menu_eleccion()
+            elif self.estado == "Esquinas":
+                self.menu_esquinas()
+            elif self.estado == "Juego":
+                self.dibujar_escena(dt)
+                
+        self.puntaje.actualizar_high_score()
+        pygame.quit()
+
+    def dibujar_escena(self, dt):
+        self.pantalla.fill((0, 0, 0))
+        
+        # Dibujar Mapa
+        for f in range(alto_mapa):
+            for c in range(largo_fila):
+                char = self.mapa[f][c]
+                color = paleta_colores.get(char, (0, 0, 0))
+                rect = (c * tamaño_pixel, f * tamaño_pixel + tamaño_score - 10, tamaño_pixel, tamaño_pixel)
+                
+                if char == ".":
+                    pygame.draw.circle(self.pantalla, color, (rect[0] + 10, rect[1] + 10), 2)
+                elif char == "o":
+                    pygame.draw.circle(self.pantalla, color, (rect[0] + 10, rect[1] + 10), 5)
+                elif char == "X":
+                    pygame.draw.rect(self.pantalla, color, rect)
+                elif char == "-":
+                    pygame.draw.rect(self.pantalla, (200, 200, 200), rect)
+
+        # Lógica Pacman
+        power_activo = self.pacman.ver_power_pellet()
+        vel_p = 2.2 if power_activo else 2.0
+        self.pacman.mover(vel_p, dt)
+        
+        puntos = self.pacman.comer()
+        if puntos > 0:
+            self.puntaje.actualizar_puntaje(puntos)
+            self.comida_faltante -= 1
+            if self.comida_faltante <= 0:
+                self.puntaje.actualizar_lvl(1)
+                self.empezar_mapa()
+
+        self.pacman.dibujar(dt)
+
+        # Lógica Fantasmas
+        for g in self.objetos_fantasmas:
+            g.mover(self.pacman.x, self.pacman.y, power_activo, dt)
+            g.dibujar()
+            
+            # Colisión
+            distancia = math.sqrt((self.pacman.x - g.x)**2 + (self.pacman.y - g.y)**2)
+            if distancia < 15:
+                if power_activo:
+                    # Fantasma vuelve a casa
+                    g.x, g.y = self.pos_spawn_fantasmas[0]*tamaño_pixel, self.pos_spawn_fantasmas[1]*tamaño_pixel
+                    self.puntaje.actualizar_puntaje(200)
+                else:
+                    self.puntaje.vidas -= 1
+                    if self.puntaje.vidas <= 0:
+                        self.estado = "Inicio" # Game over simple
+                        self.puntaje.vidas = 3
+                        self.puntaje.puntos = 0
+                        self.empezar_mapa()
+                    else:
+                        # Reset posición
+                        self.pacman.x = 1 * tamaño_pixel # Ejemplo reset manual
+                        self.pacman.y = 1 * tamaño_pixel
+                        for ghost in self.objetos_fantasmas:
+                            ghost.x, ghost.y = self.pos_spawn_fantasmas[0]*tamaño_pixel, self.pos_spawn_fantasmas[1]*tamaño_pixel
+
+        self.puntaje.mostrar()
+        pygame.display.flip()
+
+game = Juego()
+game.bucle_principal()
