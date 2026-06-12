@@ -1,4 +1,4 @@
-from clases import *
+from prueba import *
 
 def main():
     juego = Juego() 
