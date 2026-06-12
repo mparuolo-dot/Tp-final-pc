@@ -80,6 +80,7 @@ class Mapa:
     def es_libre_casa(self, fila, columna) -> bool:
         """
         Funcion para verificar si el tile es libre para los ojos de fantasmas volviendo a casa
+        
         """
         tile = self.grilla[fila][columna % largo_fila]
         if tile != "X":
@@ -314,7 +315,6 @@ class Pacman(Personajes):
     def animacion_muerte(self):
         for i in range(1,11):
             muerte_imagen = pygame.transform.scale(pygame.image.load(f"muerte_{i}.png"), (tamaño_pixel, tamaño_pixel))
-            pygame.draw.rect(self.pantalla, (196, 181, 183), (int(self.x), int(self.y) + tamaño_score - 10, tamaño_pixel, tamaño_pixel))
             self.pantalla.blit(muerte_imagen, (int(self.x), int(self.y) + tamaño_score - 10))
             pygame.display.flip()
             pygame.time.delay(120)
@@ -513,6 +513,10 @@ class Fantasma(Personajes):
             self.direccion = "abajo"
         elif self.direccion == "abajo": 
             self.direccion = "arriba"
+    def desaparecer(self):
+        pos_y_pantalla = int(self.y) + tamaño_score - 10
+        pos_x_pantalla = int(self.x) 
+        self.pantalla.blit((0,0,0),(pos_x_pantalla, pos_y_pantalla))
 
 
 class Blinky(Fantasma):
@@ -939,18 +943,18 @@ class Juego:
             
             nuevo_fantasma = None
             if numero_de_fantasma == 1:
-                nuevo_fantasma = Blinky(self.mapa, columna_casa, fila_casa, esquina_actual)
+                nuevo_fantasma = Blinky(self.mapa, columna_casa, fila_casa, esquina_actual,self.pantalla)
                 blinky_guardado = nuevo_fantasma
             elif numero_de_fantasma == 2:
-                nuevo_fantasma = Pinky(self.mapa, columna_casa + 1, fila_casa, esquina_actual)
+                nuevo_fantasma = Pinky(self.mapa, columna_casa + 1, fila_casa, esquina_actual,self.pantalla)
             elif numero_de_fantasma == 3:
-                nuevo_fantasma = Inky(self.mapa, columna_casa, fila_casa, esquina_actual, blinky_guardado)
+                nuevo_fantasma = Inky(self.mapa, columna_casa, fila_casa, esquina_actual, blinky_guardado,self.pantalla)
             elif numero_de_fantasma == 4:
-                nuevo_fantasma = Clyde(self.mapa, columna_casa - 1, fila_casa, esquina_actual)
+                nuevo_fantasma = Clyde(self.mapa, columna_casa - 1, fila_casa, esquina_actual,self.pantalla)
             elif numero_de_fantasma == 5:
-                nuevo_fantasma = Spike(self.mapa, columna_casa, fila_casa, esquina_actual)
+                nuevo_fantasma = Spike(self.mapa, columna_casa, fila_casa, esquina_actual,self.pantalla)
             elif numero_de_fantasma == 6:
-                nuevo_fantasma = Coward(self.mapa, columna_casa, fila_casa, esquina_actual)           
+                nuevo_fantasma = Coward(self.mapa, columna_casa, fila_casa, esquina_actual,self.pantalla)           
             if nuevo_fantasma is not None:
                 self.fantasmas_activos.append(nuevo_fantasma)
         for i in range(len(self.fantasmas_activos)):
@@ -1117,6 +1121,7 @@ class Juego:
                             elif fantasma.ojos == False:
                                 self.puntaje.vidas -= 1
                                 self.pacman.animacion_muerte()
+                                fantasma.desaparecer()
                                 pygame.time.delay(120)  
                                 if self.puntaje.vidas > 0:
                                     self.posiciones_iniciales()

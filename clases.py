@@ -327,8 +327,8 @@ class Fantasma(Personajes):
     """
     clase base para los fantasmas del juego que se mueven por pixeles como Pac-Man
     """
-    def __init__(self, mapa, x_inicial, y_inicial, esquina):
-        Personajes.__init__(self, mapa, None)
+    def __init__(self, mapa, x_inicial, y_inicial, esquina,pantalla):
+        Personajes.__init__(self, mapa, pantalla)
         self.x_inicial = x_inicial * tamaño_pixel
         self.y_inicial = y_inicial * tamaño_pixel
         self.mapa = mapa
@@ -513,14 +513,15 @@ class Fantasma(Personajes):
             self.direccion = "abajo"
         elif self.direccion == "abajo": 
             self.direccion = "arriba"
+    
 
 
 class Blinky(Fantasma):
     """
     clase para Blinky (Rojo - El perseguidor)
     """
-    def __init__(self, mapa, x_inicial, y_inicial, esquina):
-        Fantasma.__init__(self, mapa, x_inicial, y_inicial, esquina)
+    def __init__(self, mapa, x_inicial, y_inicial, esquina,pantalla):
+        Fantasma.__init__(self, mapa, x_inicial, y_inicial, esquina,pantalla)
         self.imagen_fantasmas = pygame.transform.scale(pygame.image.load("blinky.png"), (tamaño_pixel, tamaño_pixel))
 
     def target(self, pacman_fila, pacman_columna, proxima_direccion):
@@ -531,8 +532,8 @@ class Pinky(Fantasma):
     """
     clase para Pinky (Rosa - El emboscador)
     """
-    def __init__(self, mapa, x_inicial, y_inicial, esquina):
-        Fantasma.__init__(self, mapa, x_inicial, y_inicial, esquina)
+    def __init__(self, mapa, x_inicial, y_inicial, esquina,pantalla):
+        Fantasma.__init__(self, mapa, x_inicial, y_inicial, esquina,pantalla)
         self.imagen_fantasmas = pygame.transform.scale(pygame.image.load("pinky.png"), (tamaño_pixel, tamaño_pixel))
 
 
@@ -554,8 +555,8 @@ class Inky(Fantasma):
     """
     clase para Inky (Celeste - El flanqueador)
     """
-    def __init__(self, mapa, x_inicial, y_inicial, esquina, blinky=None):
-        Fantasma.__init__(self, mapa, x_inicial, y_inicial, esquina)
+    def __init__(self, mapa, x_inicial, y_inicial, esquina,pantalla, blinky=None):
+        Fantasma.__init__(self, mapa, x_inicial, y_inicial, esquina,pantalla)
         self.blinky = blinky
         self.imagen_fantasmas = pygame.transform.scale(pygame.image.load("inky.png"), (tamaño_pixel, tamaño_pixel))
 
@@ -588,8 +589,8 @@ class Clyde(Fantasma):
     """
     clase para Clyde (Naranja - El timido)
     """
-    def __init__(self, mapa, x_inicial, y_inicial, esquina):
-        Fantasma.__init__(self, mapa, x_inicial, y_inicial, esquina)
+    def __init__(self, mapa, x_inicial, y_inicial, esquina,pantalla):
+        Fantasma.__init__(self, mapa, x_inicial, y_inicial, esquina,pantalla)
         self.imagen_fantasmas = pygame.transform.scale(pygame.image.load("clyde.png"), (tamaño_pixel, tamaño_pixel))
 
     def target(self, pacman_fila, pacman_columna, proxima_direccion):
@@ -606,8 +607,8 @@ class Spike(Fantasma):
     """
     clase para Spike (Verde - El interceptor)
     """
-    def __init__(self, mapa, x_inicial, y_inicial, esquina):
-        Fantasma.__init__(self, mapa, x_inicial, y_inicial, esquina)
+    def __init__(self, mapa, x_inicial, y_inicial, esquina,pantalla):
+        Fantasma.__init__(self, mapa, x_inicial, y_inicial, esquina,pantalla)
         self.imagen_fantasmas = pygame.transform.scale(pygame.image.load("spike.png"), (tamaño_pixel, tamaño_pixel))
 
     def target(self, pacman_fila, pacman_columna, proxima_direccion):
@@ -630,8 +631,8 @@ class Coward(Fantasma):
     """
     clase para Coward (Violeta - El cobarde)
     """
-    def __init__(self, mapa, x_inicial, y_inicial, esquina):
-        Fantasma.__init__(self, mapa, x_inicial, y_inicial, esquina)
+    def __init__(self, mapa, x_inicial, y_inicial, esquina,pantalla):
+        Fantasma.__init__(self, mapa, x_inicial, y_inicial, esquina,pantalla)
         self.imagen_fantasmas = pygame.transform.scale(pygame.image.load("coward.png"), (tamaño_pixel, tamaño_pixel))
 
 
@@ -748,6 +749,12 @@ class Juego:
         Funcion para iniciar el juego
         """
         pygame.init()  # inicializamos la pantalla del pygame
+        pygame.mixer.init()
+        pygame.mixer.music.load("musica_inicio.mp3")
+        self.sonido_muerte = pygame.mixer.Sound("muerte.mp3")
+        self.sonido_comida = pygame.mixer.Sound("pacman_come.mp3")
+        self.sonido_comer_fantasma = pygame.mixer.Sound("pacman_come_fantasma.mp3")
+        pygame.mixer.music.play(-1)
         self.pantalla = pygame.display.set_mode((largo_fila * tamaño_pixel, (alto_mapa * tamaño_pixel) + tamaño_score + 30))  # creamse la pantalla del juego
         self.fps =  pygame.time.Clock() # creamos un objeto que usamos para los fps
         self.puntaje = Puntaje(0, self.pantalla) # creamos un objeto de la clase Puntaje y lo seteamos para que empeize en 0 
@@ -939,18 +946,18 @@ class Juego:
             
             nuevo_fantasma = None
             if numero_de_fantasma == 1:
-                nuevo_fantasma = Blinky(self.mapa, columna_casa, fila_casa, esquina_actual)
+                nuevo_fantasma = Blinky(self.mapa, columna_casa, fila_casa, esquina_actual,self.pantalla)
                 blinky_guardado = nuevo_fantasma
             elif numero_de_fantasma == 2:
-                nuevo_fantasma = Pinky(self.mapa, columna_casa + 1, fila_casa, esquina_actual)
+                nuevo_fantasma = Pinky(self.mapa, columna_casa + 1, fila_casa, esquina_actual,self.pantalla)
             elif numero_de_fantasma == 3:
-                nuevo_fantasma = Inky(self.mapa, columna_casa, fila_casa, esquina_actual, blinky_guardado)
+                nuevo_fantasma = Inky(self.mapa, columna_casa, fila_casa, esquina_actual, self.pantalla,blinky_guardado)
             elif numero_de_fantasma == 4:
-                nuevo_fantasma = Clyde(self.mapa, columna_casa - 1, fila_casa, esquina_actual)
+                nuevo_fantasma = Clyde(self.mapa, columna_casa - 1, fila_casa, esquina_actual,self.pantalla)
             elif numero_de_fantasma == 5:
-                nuevo_fantasma = Spike(self.mapa, columna_casa, fila_casa, esquina_actual)
+                nuevo_fantasma = Spike(self.mapa, columna_casa, fila_casa, esquina_actual,self.pantalla)
             elif numero_de_fantasma == 6:
-                nuevo_fantasma = Coward(self.mapa, columna_casa, fila_casa, esquina_actual)           
+                nuevo_fantasma = Coward(self.mapa, columna_casa, fila_casa, esquina_actual,self.pantalla)           
             if nuevo_fantasma is not None:
                 self.fantasmas_activos.append(nuevo_fantasma)
         for i in range(len(self.fantasmas_activos)):
@@ -1061,12 +1068,18 @@ class Juego:
 
             if self.estado == "Inicio": # si el estado es inicio
                 self.pantalla_inicio()
+                if not pygame.mixer.music.get_busy():  # solo reproducir si no está sonando
+                    pygame.mixer.music.play(-1)
             elif self.estado == "Elegir Fantasmas": # si el estado es elegir fantasmas
                 self.elegir_fantasmas()
             elif self.estado == "Esquinas Fantasmas": # si el estado es esquinas de fantasmas
                 self.esquinas_fantasmas()
             elif self.estado == "Juego": # si el estado es juego
                 self.pantalla.fill((0,0,0))  # seteamos la pantalla a negro
+                pygame.mixer.music.load("musica_juego.mp3")
+                if not pygame.mixer.music.get_busy():  # solo reproducir si no está sonando
+                    pygame.mixer.music.play(-1) 
+                
                 
                 self.mapa.dibujar(self.pantalla) 
                 self.actualizar_fases_modo(dt)  
@@ -1116,6 +1129,7 @@ class Juego:
                                 fantasma.ojos = True # mandamos los ojos del fantasma de regreso a casa
                             elif fantasma.ojos == False:
                                 self.puntaje.vidas -= 1
+                                self.sonido_muerte.play()
                                 self.pacman.animacion_muerte()
                                 pygame.time.delay(120)  
                                 if self.puntaje.vidas > 0:
