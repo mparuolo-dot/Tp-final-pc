@@ -183,9 +183,11 @@ class Pacman(Personajes):
             self.proxima_direccion = "arriba"
         elif claves[pygame.K_DOWN]:
             self.proxima_direccion = "abajo"
-        if self.x % tamaño_pixel < velocidad_pixeles * dt and self.y % tamaño_pixel < velocidad_pixeles * dt:    # verificamos si el pacman esta cerca del centro de un tile dependiendo de la velocidad
-            self.x = int(self.x // tamaño_pixel) * tamaño_pixel
-            self.y = int(self.y // tamaño_pixel) * tamaño_pixel  #sacamos decimales y lo multiplicamos por el tamaño de los pixeles para qeu no se superponga con paredes
+        tile_mas_cercano_x = round(self.x // tamaño_pixel) * tamaño_pixel
+        tile_mas_cercano_y = round(self.y // tamaño_pixel) * tamaño_pixel
+        if abs(self.x - tile_mas_cercano_x) < velocidad_pixeles * dt and abs(self.y - tile_mas_cercano_y) < velocidad_pixeles * dt:   # verificamos si el pacman esta cerca del centro de un tile dependiendo de la velocidad
+            self.x = tile_mas_cercano_x
+            self.y = tile_mas_cercano_y
             proxima_doblar_x = self.x // tamaño_pixel
             proxima_doblar_y = self.y // tamaño_pixel  # para verificar las paredes y a donde tenemos que ir volvemos a pasar de pixeles a tiles
 
@@ -422,10 +424,11 @@ class Fantasma(Personajes):
                 self.salio = False # Vuelve a regenerarse dentro y sale de forma normal
                 return
 
-        # Verificamos si esta centrado en una baldosa para calcular la proxima direccion
-        if self.x % tamaño_pixel < velocidad_pixeles * dt and self.y % tamaño_pixel < velocidad_pixeles * dt:
-            self.x = int(self.x // tamaño_pixel) * tamaño_pixel
-            self.y = int(self.y // tamaño_pixel) * tamaño_pixel
+        tile_mas_cercano_x = round(self.x // tamaño_pixel) * tamaño_pixel
+        tile_mas_cercano_y = round(self.y // tamaño_pixel) * tamaño_pixel
+        if abs(self.x - tile_mas_cercano_x) < velocidad_pixeles * dt and abs(self.y - tile_mas_cercano_y) < velocidad_pixeles * dt:   # verificamos si el pacman esta cerca del centro de un tile dependiendo de la velocidad
+            self.x = tile_mas_cercano_x
+            self.y = tile_mas_cercano_y
 
             posicion_x = int(self.x // tamaño_pixel)
             posicion_y = int(self.y // tamaño_pixel)
@@ -1065,6 +1068,8 @@ class Juego:
                     if self.posicion_fantasma_seleccionado == len(self.fantasmas_seleccionados):
                         self.estado = "Juego"
                         self.crear_fantasmas()
+                        pygame.mixer.music.load("musica_juego.mp3") # solo reproducir si no está sonando
+                        pygame.mixer.music.play(-1) 
 
             if self.estado == "Inicio": # si el estado es inicio
                 self.pantalla_inicio()
@@ -1076,9 +1081,7 @@ class Juego:
                 self.esquinas_fantasmas()
             elif self.estado == "Juego": # si el estado es juego
                 self.pantalla.fill((0,0,0))  # seteamos la pantalla a negro
-                pygame.mixer.music.load("musica_juego.mp3")
-                if not pygame.mixer.music.get_busy():  # solo reproducir si no está sonando
-                    pygame.mixer.music.play(-1) 
+
                 
                 
                 self.mapa.dibujar(self.pantalla) 
@@ -1098,6 +1101,8 @@ class Juego:
                         self.puntaje.actualizar_puntaje(score) # actualizamos el puntaje
                     else:
                         self.puntaje.actualizar_puntaje(score) # actualizamos el puntaje
+                        if score == 50:
+                            self.sonido_comida.play()
                         self.puntos_comidos_nivel += score
                         self.comida_faltante -= 1 # restamos 1 al contador de comida
                         if self.comida_faltante == 0: # si no quedan mas comida
@@ -1120,6 +1125,7 @@ class Juego:
                         if distancia < 15: # colision cercana entre el pacman y un fantasma
                             if fantasma.esta_asustado == True:
                                 self.fantasmas_comidos_ronda += 1
+                                self.sonido_comer_fantasma.play()
                                 puntos_comer_fantasmas = 200 * (2 ** (self.fantasmas_comidos_ronda - 1))
                                 if puntos_comer_fantasmas > 1600:
                                     puntos_comer_fantasmas = 1600
